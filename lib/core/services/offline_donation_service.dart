@@ -144,6 +144,14 @@ class OfflineDonationService {
             donationAmount: donation.amountInCents,
             paymentMethod: donation.paymentMethod,
             offlineId: donation.offlineId,
+            items: [
+              DeliveryItem(
+                itemType: 'donation',
+                name: 'Donation',
+                quantity: 1,
+                description: donation.notes ?? 'Offline donation',
+              ),
+            ],
           );
 
           final response = await _apiClient!.post(

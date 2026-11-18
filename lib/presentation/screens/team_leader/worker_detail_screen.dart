@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../widgets/loading/skeleton_loader.dart';
@@ -84,6 +85,7 @@ class _WorkerDetailScreenState extends State<WorkerDetailScreen>
           '/api/prayer-requests/worker/${widget.workerId}',
           queryParameters: {'page': 1, 'page_size': 100},
         );
+        debugPrint('WorkerDetail prayers response: ${response.data}');
         if (response.statusCode == 200) {
           final body = response.data;
           final List<dynamic> rows = body is Map
@@ -184,7 +186,8 @@ class _WorkerDetailScreenState extends State<WorkerDetailScreen>
       setState(() {
         _isLoading = false;
         if (_donations.isEmpty && _prayers.isEmpty && errors.isNotEmpty) {
-          _error = 'Unable to load light squad analytics (${errors.join(', ')})';
+          _error =
+              'Unable to load light squad analytics (${errors.join(', ')})';
         }
       });
     } catch (e) {
@@ -369,9 +372,8 @@ class _WorkerDetailScreenState extends State<WorkerDetailScreen>
           const SizedBox(height: 20),
           Text(
             'Activity This Week',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            style: Theme.of(context).textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 10),
           Container(

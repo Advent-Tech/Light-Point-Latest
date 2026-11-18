@@ -411,7 +411,101 @@ class CreateDeliveryRequest {
   });
 
   factory CreateDeliveryRequest.fromJson(Map<String, dynamic> json) => _$CreateDeliveryRequestFromJson(json);
-  Map<String, dynamic> toJson() => _$CreateDeliveryRequestToJson(this);
+  Map<String, dynamic> toJson() {
+    final effectiveItems = items.isNotEmpty
+        ? items.map((e) => e.toJson()).toList()
+        : [
+            DeliveryItem(
+              itemType: deliveryType == 'donation'
+                  ? 'donation'
+                  : (deliveryType == 'book_sale' ? 'book' : 'standard'),
+              name: deliveryType == 'donation'
+                  ? (donationAmount != null && donationAmount! > 0
+                      ? 'Donation (\$${donationAmount!.toStringAsFixed(2)})'
+                      : 'Donation')
+                  : (bookTitle ?? 'Delivery Item'),
+              quantity: bookQuantity ?? 1,
+              description: notes ?? (deliveryType == 'donation' ? 'Donation' : null),
+            ).toJson(),
+          ];
+
+    final data = <String, dynamic>{
+      'team_id': teamId,
+      'items': effectiveItems,
+      'recipient_name': recipientName.trim().isNotEmpty ? recipientName.trim() : 'Anonymous',
+      'address': address.trim().isNotEmpty ? address.trim() : 'Location recorded',
+      'delivery_type': deliveryType.isNotEmpty ? deliveryType : 'door_to_door',
+      'priority': (priority != null && priority!.isNotEmpty) ? priority : 'medium',
+    };
+
+    if (recipientPhone != null && recipientPhone!.trim().isNotEmpty) {
+      data['recipient_phone'] = recipientPhone!.trim();
+    }
+    if (recipientEmail != null && recipientEmail!.trim().isNotEmpty) {
+      data['recipient_email'] = recipientEmail!.trim();
+    }
+    if (city != null && city!.trim().isNotEmpty) {
+      data['city'] = city!.trim();
+    }
+    if (state != null && state!.trim().isNotEmpty) {
+      data['state'] = state!.trim();
+    }
+    if (zipCode != null && zipCode!.trim().isNotEmpty) {
+      data['zip_code'] = zipCode!.trim();
+    }
+    if (latitude != null) {
+      data['latitude'] = latitude;
+    }
+    if (longitude != null) {
+      data['longitude'] = longitude;
+    }
+    if (notes != null && notes!.trim().isNotEmpty) {
+      data['notes'] = notes!.trim();
+    }
+    if (territoryId != null && territoryId!.trim().isNotEmpty) {
+      data['territory_id'] = territoryId!.trim();
+    }
+    if (territoryName != null && territoryName!.trim().isNotEmpty) {
+      data['territory_name'] = territoryName!.trim();
+    }
+    if (householdId != null && householdId!.trim().isNotEmpty) {
+      data['household_id'] = householdId!.trim();
+    }
+    final effectiveUnitPrice = (deliveryType == 'book_sale')
+        ? ((bookUnitPrice != null && bookUnitPrice! > 0) ? bookUnitPrice! : 10.0)
+        : bookUnitPrice;
+    if (effectiveUnitPrice != null) {
+      data['book_unit_price'] = effectiveUnitPrice;
+    }
+
+    if (donationAmount != null) {
+      data['donation_amount'] = (deliveryType == 'book_sale' && donationAmount! <= 0)
+          ? ((effectiveUnitPrice ?? 10.0) * (bookQuantity ?? 1))
+          : donationAmount;
+    } else if (deliveryType == 'book_sale') {
+      data['donation_amount'] = (effectiveUnitPrice ?? 10.0) * (bookQuantity ?? 1);
+    }
+    if (paymentMethod != null && paymentMethod!.trim().isNotEmpty) {
+      data['payment_method'] = paymentMethod!.trim();
+    }
+    if (bookCode != null && bookCode!.trim().isNotEmpty) {
+      data['book_code'] = bookCode!.trim();
+    }
+    if (bookTitle != null && bookTitle!.trim().isNotEmpty) {
+      data['book_title'] = bookTitle!.trim();
+    }
+    if (bookLanguage != null && bookLanguage!.trim().isNotEmpty) {
+      data['book_language'] = bookLanguage!.trim();
+    }
+    if (bookQuantity != null) {
+      data['book_quantity'] = bookQuantity;
+    }
+    if (offlineId != null && offlineId!.trim().isNotEmpty) {
+      data['offline_id'] = offlineId!.trim();
+    }
+
+    return data;
+  }
 
   // Helper to check if this is a donation request
   bool get isDonation => deliveryType == 'donation';

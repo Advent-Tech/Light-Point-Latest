@@ -19,6 +19,25 @@ class TargetDefinition {
     this.isActive,
   });
 
+  static double parseDouble(dynamic v, [double defaultValue = 0.0]) {
+    if (v == null) return defaultValue;
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v) ?? defaultValue;
+    return defaultValue;
+  }
+
+  static bool? parseBool(dynamic v) {
+    if (v == null) return null;
+    if (v is bool) return v;
+    if (v is num) return v != 0;
+    if (v is String) {
+      final s = v.toLowerCase().trim();
+      if (s == 'true' || s == '1') return true;
+      if (s == 'false' || s == '0') return false;
+    }
+    return null;
+  }
+
   factory TargetDefinition.fromJson(Map<String, dynamic> json) {
     return TargetDefinition(
       id: json['id']?.toString() ?? '',
@@ -26,9 +45,9 @@ class TargetDefinition {
       description: json['description']?.toString(),
       targetType: json['target_type']?.toString() ?? '',
       targetUnit: json['target_unit']?.toString() ?? '',
-      targetValue: (json['target_value'] ?? 0).toDouble(),
+      targetValue: parseDouble(json['target_value']),
       periodType: json['period_type']?.toString() ?? '',
-      isActive: json['is_active'] is bool ? json['is_active'] as bool : null,
+      isActive: parseBool(json['is_active']),
     );
   }
 
@@ -70,16 +89,49 @@ class TargetAssignment {
       return null;
     }
 
+    TargetDefinition? target;
+    final dynamic rawTarget = json['target'] ??
+        json['target_definition'] ??
+        json['targetDefinition'] ??
+        json['definition'] ??
+        json['template'] ??
+        json['target_template'];
+    if (rawTarget is Map) {
+      target = TargetDefinition.fromJson(
+        rawTarget.cast<String, dynamic>(),
+      );
+    } else if (json['target_type'] != null ||
+        json['target_unit'] != null ||
+        json['target_value'] != null ||
+        json['target_name'] != null ||
+        json['name'] != null) {
+      target = TargetDefinition.fromJson(json);
+    }
+
+    final assignedToType = (json['assigned_to_type'] ??
+            json['assignedToType'] ??
+            (json['worker_id'] != null
+                ? 'worker'
+                : (json['team_id'] != null ? 'team' : '')))
+        ?.toString() ??
+        '';
+
+    final assignedToId = (json['assigned_to_id'] ??
+            json['assignedToId'] ??
+            json['worker_id'] ??
+            json['team_id'] ??
+            '')
+        ?.toString() ??
+        '';
+
     return TargetAssignment(
-      id: json['id']?.toString() ?? '',
-      assignedToType: json['assigned_to_type']?.toString() ?? '',
-      assignedToId: json['assigned_to_id']?.toString() ?? '',
+      id: json['id']?.toString() ?? json['assignment_id']?.toString() ?? '',
+      assignedToType: assignedToType,
+      assignedToId: assignedToId,
       periodStart: parseDate(json['period_start']),
       periodEnd: parseDate(json['period_end']),
       status: json['status']?.toString(),
-      target: json['target'] is Map<String, dynamic>
-          ? TargetDefinition.fromJson(json['target'] as Map<String, dynamic>)
-          : null,
+      target: target,
     );
   }
 }
@@ -94,14 +146,16 @@ class TargetProgress {
   });
 
   factory TargetProgress.fromJson(Map<String, dynamic> json) {
-    final lastUpdatedRaw = json['last_updated'];
+    final lastUpdatedRaw = json['last_updated'] ?? json['updated_at'];
     DateTime? lastUpdated;
     if (lastUpdatedRaw is String && lastUpdatedRaw.isNotEmpty) {
       lastUpdated = DateTime.tryParse(lastUpdatedRaw);
     }
 
     return TargetProgress(
-      currentValue: (json['current_value'] ?? 0).toDouble(),
+      currentValue: TargetDefinition.parseDouble(
+        json['current_value'] ?? json['currentValue'] ?? json['progress_value'],
+      ),
       lastUpdated: lastUpdated,
     );
   }
@@ -121,21 +175,33 @@ class AssignedTargetWithProgress {
   });
 
   factory AssignedTargetWithProgress.fromJson(Map<String, dynamic> json) {
+    final assignmentMap = json['assignment'] is Map
+        ? (json['assignment'] as Map).cast<String, dynamic>()
+        : json;
+    final progressMap = json['progress'] is Map
+        ? (json['progress'] as Map).cast<String, dynamic>()
+        : json;
+
+    final assignment = TargetAssignment.fromJson(assignmentMap);
+    final progress = TargetProgress.fromJson(progressMap);
+
+    double? percentage = json['percentage'] == null
+        ? null
+        : TargetDefinition.parseDouble(json['percentage']);
+    if (percentage == null) {
+      final current = progress.currentValue;
+      final targetVal = assignment.target?.targetValue ?? 0.0;
+      if (targetVal > 0) {
+        percentage = (current / targetVal) * 100.0;
+      }
+    }
+
     return AssignedTargetWithProgress(
-      assignment: TargetAssignment.fromJson(
-        (json['assignment'] as Map?)?.cast<String, dynamic>() ??
-            const <String, dynamic>{},
-      ),
-      progress: TargetProgress.fromJson(
-        (json['progress'] as Map?)?.cast<String, dynamic>() ??
-            const <String, dynamic>{},
-      ),
-      percentage: json['percentage'] == null
-          ? null
-          : (json['percentage'] ?? 0).toDouble(),
-      isCompleted: json['is_completed'] is bool
-          ? json['is_completed'] as bool
-          : null,
+      assignment: assignment,
+      progress: progress,
+      percentage: percentage,
+      isCompleted: TargetDefinition.parseBool(json['is_completed']) ??
+          (percentage != null && percentage >= 100.0),
     );
   }
 }
@@ -152,13 +218,17 @@ class TeamMemberLite {
   });
 
   factory TeamMemberLite.fromJson(Map<String, dynamic> json) {
-    final displayName = json['display_name']?.toString();
+    final displayName =
+        json['display_name']?.toString() ?? json['displayName']?.toString();
     final name = (displayName?.isNotEmpty == true)
         ? displayName!
         : (json['name']?.toString() ?? json['email']?.toString() ?? 'Worker');
 
     return TeamMemberLite(
-      id: json['id']?.toString() ?? '',
+      id: json['id']?.toString() ??
+          json['user_id']?.toString() ??
+          json['worker_id']?.toString() ??
+          '',
       name: name,
       email: json['email']?.toString(),
     );

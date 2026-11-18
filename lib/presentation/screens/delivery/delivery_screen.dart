@@ -947,6 +947,7 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
     try {
       final storage = await LocalStorage.getInstance();
       final userData = storage.getUserData();
+      if (!mounted) return;
       setState(() {
         _teamId =
             userData?['team_id']?.toString() ?? userData?['teamId']?.toString();
@@ -959,6 +960,7 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
   }
 
   Future<void> _getCurrentLocation() async {
+    if (!mounted) return;
     setState(() => _isGettingLocation = true);
     try {
       LocationPermission permission = await Geolocator.checkPermission();
@@ -967,6 +969,7 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
       }
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
+        if (!mounted) return;
         setState(() => _isGettingLocation = false);
         return;
       }
@@ -974,6 +977,7 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
         desiredAccuracy: LocationAccuracy.high,
         timeLimit: const Duration(seconds: 10),
       );
+      if (!mounted) return;
       setState(() {
         _latitude = position.latitude;
         _longitude = position.longitude;
@@ -982,6 +986,7 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
       await _findTerritory();
     } catch (e) {
       debugPrint('Error getting location: $e');
+      if (!mounted) return;
       setState(() => _isGettingLocation = false);
     }
   }
@@ -991,6 +996,7 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
     try {
       final repository = TerritoryRepository();
       final result = await repository.getMyAssignments(workerId: _workerId);
+      if (!mounted) return;
       if (result is ApiSuccess) {
         final assignments = (result as ApiSuccess).data;
         for (final assignment in assignments) {
@@ -1000,6 +1006,7 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
             _longitude!,
             assignment.geometry!,
           )) {
+            if (!mounted) return;
             setState(() {
               _territoryId = assignment.territoryId;
               _territoryName = assignment.entityName;
@@ -1072,8 +1079,10 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
 
   Future<bool> _processPayment(double amount) async {
     // Cash payment - immediate completion
+    if (!mounted) return false;
     setState(() => _isProcessingPayment = true);
     await Future.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return false;
     setState(() => _isProcessingPayment = false);
     return true;
   }
@@ -1123,18 +1132,41 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
 
     final amount = double.tryParse(_amountController.text) ?? 0;
 
+    // Acquire location if not yet loaded
+    if (_latitude == null || _longitude == null) {
+      try {
+        final pos = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.medium,
+          timeLimit: const Duration(seconds: 3),
+        );
+        _latitude = pos.latitude;
+        _longitude = pos.longitude;
+      } catch (_) {
+        try {
+          final last = await Geolocator.getLastKnownPosition();
+          if (last != null) {
+            _latitude = last.latitude;
+            _longitude = last.longitude;
+          }
+        } catch (_) {}
+      }
+    }
+
     // Process payment first
     final paymentSuccess = await _processPayment(amount);
     if (!paymentSuccess) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Payment failed. Please try again.'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Payment failed. Please try again.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
       return;
     }
 
+    if (!mounted) return;
     setState(() => _isSubmitting = true);
 
     try {
@@ -1142,7 +1174,9 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
 
       final request = CreateDeliveryRequest(
         teamId: _teamId!,
-        recipientName: _nameController.text.trim(),
+        recipientName: _nameController.text.trim().isNotEmpty
+            ? _nameController.text.trim()
+            : 'Anonymous',
         address: _addressController.text.trim().isNotEmpty
             ? _addressController.text.trim()
             : 'Location recorded',
@@ -1159,7 +1193,14 @@ class _RecordDonationSheetState extends State<_RecordDonationSheet> {
             : null,
         territoryId: _territoryId,
         territoryName: _territoryName,
-        items: [],
+        items: [
+          DeliveryItem(
+            itemType: 'donation',
+            name: 'Donation',
+            quantity: 1,
+            description: 'Donation amount: \$$amount',
+          ),
+        ],
       );
 
       context.read<DeliveryBloc>().add(DeliveryCreate(request: request));
@@ -1682,6 +1723,7 @@ class _RecordBookDistributionSheetState extends State<_RecordBookDistributionShe
   final _phoneController = TextEditingController();
   final _notesController = TextEditingController();
   final _quantityController = TextEditingController(text: '1');
+  final _priceController = TextEditingController(text: '10.00');
 
   int _selectedBookIndex = 0;
   bool _isSubmitting = false;
@@ -1709,6 +1751,7 @@ class _RecordBookDistributionSheetState extends State<_RecordBookDistributionShe
     _phoneController.dispose();
     _notesController.dispose();
     _quantityController.dispose();
+    _priceController.dispose();
     super.dispose();
   }
 
@@ -1716,6 +1759,7 @@ class _RecordBookDistributionSheetState extends State<_RecordBookDistributionShe
     try {
       final storage = await LocalStorage.getInstance();
       final userData = storage.getUserData();
+      if (!mounted) return;
       setState(() {
         _teamId =
             userData?['team_id']?.toString() ?? userData?['teamId']?.toString();
@@ -1728,6 +1772,7 @@ class _RecordBookDistributionSheetState extends State<_RecordBookDistributionShe
   }
 
   Future<void> _getCurrentLocation() async {
+    if (!mounted) return;
     setState(() => _isGettingLocation = true);
     try {
       LocationPermission permission = await Geolocator.checkPermission();
@@ -1736,6 +1781,7 @@ class _RecordBookDistributionSheetState extends State<_RecordBookDistributionShe
       }
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
+        if (!mounted) return;
         setState(() => _isGettingLocation = false);
         return;
       }
@@ -1743,6 +1789,7 @@ class _RecordBookDistributionSheetState extends State<_RecordBookDistributionShe
         desiredAccuracy: LocationAccuracy.high,
         timeLimit: const Duration(seconds: 10),
       );
+      if (!mounted) return;
       setState(() {
         _latitude = position.latitude;
         _longitude = position.longitude;
@@ -1750,6 +1797,7 @@ class _RecordBookDistributionSheetState extends State<_RecordBookDistributionShe
       });
       await _findTerritory();
     } catch (_) {
+      if (!mounted) return;
       setState(() => _isGettingLocation = false);
     }
   }
@@ -1759,6 +1807,7 @@ class _RecordBookDistributionSheetState extends State<_RecordBookDistributionShe
     try {
       final repository = TerritoryRepository();
       final result = await repository.getMyAssignments(workerId: _workerId);
+      if (!mounted) return;
       if (result is ApiSuccess) {
         final assignments = (result as ApiSuccess).data;
         for (final assignment in assignments) {
@@ -1768,6 +1817,7 @@ class _RecordBookDistributionSheetState extends State<_RecordBookDistributionShe
             _longitude!,
             assignment.geometry!,
           )) {
+            if (!mounted) return;
             setState(() {
               _territoryId = assignment.territoryId;
               _territoryName = assignment.entityName;
@@ -1823,6 +1873,7 @@ class _RecordBookDistributionSheetState extends State<_RecordBookDistributionShe
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     if (_teamId == null || _teamId!.isEmpty) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('You must be assigned to a team'),
@@ -1832,6 +1883,26 @@ class _RecordBookDistributionSheetState extends State<_RecordBookDistributionShe
       return;
     }
     if (_latitude == null || _longitude == null) {
+      try {
+        final pos = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.medium,
+          timeLimit: const Duration(seconds: 3),
+        );
+        _latitude = pos.latitude;
+        _longitude = pos.longitude;
+      } catch (_) {
+        try {
+          final last = await Geolocator.getLastKnownPosition();
+          if (last != null) {
+            _latitude = last.latitude;
+            _longitude = last.longitude;
+          }
+        } catch (_) {}
+      }
+    }
+
+    if (_latitude == null || _longitude == null) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Location is required. Please enable GPS and retry.'),
@@ -1841,15 +1912,20 @@ class _RecordBookDistributionSheetState extends State<_RecordBookDistributionShe
       return;
     }
 
+    if (!mounted) return;
     setState(() => _isSubmitting = true);
     final quantity = int.tryParse(_quantityController.text.trim()) ?? 1;
+    final pricePerBook = double.tryParse(_priceController.text.trim()) ?? 10.0;
+    final totalAmount = pricePerBook * quantity;
     final languageLabel = _selectedBook.language == 'spanish'
         ? 'Spanish'
         : 'English';
 
     final request = CreateDeliveryRequest(
       teamId: _teamId!,
-      recipientName: _nameController.text.trim(),
+      recipientName: _nameController.text.trim().isNotEmpty
+          ? _nameController.text.trim()
+          : 'Anonymous',
       address: _addressController.text.trim().isNotEmpty
           ? _addressController.text.trim()
           : 'Location recorded',
@@ -1859,13 +1935,13 @@ class _RecordBookDistributionSheetState extends State<_RecordBookDistributionShe
       latitude: _latitude,
       longitude: _longitude,
       deliveryType: 'book_sale',
-      donationAmount: 0,
+      donationAmount: totalAmount,
       paymentMethod: 'cash',
       bookCode: _selectedBook.code,
       bookTitle: _selectedBook.title,
       bookLanguage: _selectedBook.language,
       bookQuantity: quantity,
-      bookUnitPrice: 0,
+      bookUnitPrice: pricePerBook,
       notes: _notesController.text.trim().isNotEmpty
           ? _notesController.text.trim()
           : null,
@@ -1877,7 +1953,7 @@ class _RecordBookDistributionSheetState extends State<_RecordBookDistributionShe
           itemType: 'book',
           name: _selectedBook.title,
           quantity: quantity,
-          description: 'book_code=${_selectedBook.code};language=$languageLabel',
+          description: 'book_code=${_selectedBook.code};language=$languageLabel;price=\$$pricePerBook',
         ),
       ],
     );
@@ -2028,6 +2104,20 @@ class _RecordBookDistributionSheetState extends State<_RecordBookDistributionShe
                   ),
                   const SizedBox(height: 12),
                   CustomTextField(
+                    controller: _priceController,
+                    label: 'Price per Book (\$) *',
+                    hint: 'e.g. 10.00',
+                    prefixIcon: Icons.attach_money,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    validator: (value) {
+                      final p = double.tryParse(value ?? '');
+                      if (p == null || p <= 0) return 'Price must be greater than 0';
+                      return null;
+                    },
+                    onChanged: (_) => setState(() {}),
+                  ),
+                  const SizedBox(height: 12),
+                  CustomTextField(
                     controller: _notesController,
                     label: 'Notes',
                     hint: 'Optional notes',
@@ -2045,9 +2135,15 @@ class _RecordBookDistributionSheetState extends State<_RecordBookDistributionShe
                       children: [
                         Text('Selected: ${_selectedBook.title}'),
                         const SizedBox(height: 4),
-                        Text(
-                          'Quantity: $quantity',
-                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        Builder(
+                          builder: (context) {
+                            final price = double.tryParse(_priceController.text.trim()) ?? 0;
+                            final total = price * quantity;
+                            return Text(
+                              'Quantity: $quantity  •  Price: \$${price.toStringAsFixed(2)}  •  Total: \$${total.toStringAsFixed(2)}',
+                              style: const TextStyle(fontWeight: FontWeight.w700),
+                            );
+                          },
                         ),
                         if (_isGettingLocation)
                           const Padding(

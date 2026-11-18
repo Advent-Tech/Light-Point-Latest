@@ -261,6 +261,7 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
     try {
       final response = await _apiClient.get(
         '${ApiConstants.territories}/my-allocations',
+        queryParameters: {'include_geometry': true},
       );
 
       if (response.statusCode == 200) {
@@ -276,10 +277,6 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
         );
 
         return results.whereType<Map<String, dynamic>>().map((item) {
-          final territory = item['territory'];
-          if (territory is Map<String, dynamic>) {
-            return GeoTerritory.fromJson(_sanitizeGeoTerritoryJson(territory));
-          }
           return GeoTerritory.fromJson(_sanitizeGeoTerritoryJson(item));
         }).toList();
       }
@@ -795,15 +792,40 @@ class CommandCenterBloc extends Bloc<CommandCenterEvent, CommandCenterState> {
   }
 
   Map<String, dynamic> _sanitizeGeoTerritoryJson(Map<String, dynamic> json) {
-    final id = json['id']?.toString() ?? '';
-    final solid = json['solid']?.toString() ?? 'false';
-    final entityName =
-        json['entity_name']?.toString() ?? json['entityName']?.toString() ?? '';
-    final entityId =
-        json['entity_id']?.toString() ?? json['entityId']?.toString() ?? '';
+    final territoryMap = json['territory'];
+    final source = (territoryMap is Map<String, dynamic>) ? territoryMap : json;
+
+    final id = source['territory_id']?.toString() ??
+        source['territoryId']?.toString() ??
+        json['territory_id']?.toString() ??
+        json['territoryId']?.toString() ??
+        source['id']?.toString() ??
+        json['id']?.toString() ??
+        '';
+
+    final solid = source['territory_solid']?.toString() ??
+        source['territorySolid']?.toString() ??
+        json['territory_solid']?.toString() ??
+        json['territorySolid']?.toString() ??
+        source['solid']?.toString() ??
+        json['solid']?.toString() ??
+        '';
+
+    final entityName = source['entity_name']?.toString() ??
+        source['entityName']?.toString() ??
+        source['name']?.toString() ??
+        json['entity_name']?.toString() ??
+        json['entityName']?.toString() ??
+        '';
+
+    final entityId = source['entity_id']?.toString() ??
+        source['entityId']?.toString() ??
+        json['entity_id']?.toString() ??
+        '';
 
     return <String, dynamic>{
       ...json,
+      if (territoryMap is Map<String, dynamic>) ...territoryMap,
       'id': id,
       'solid': solid,
       'entity_name': entityName,

@@ -132,6 +132,77 @@ class TerritoryRepository {
     }
   }
 
+  // Assign territory to worker / user
+  Future<ApiResult<TerritoryAssignment>> assignTerritoryToWorker({
+    required String territoryId,
+    required String territorySolid,
+    required String workerId,
+    required String teamId,
+    required String assignedBy,
+    String priority = 'medium',
+    String? notes,
+  }) async {
+    try {
+      final response = await _apiClient.dio.post(
+        ApiConstants.assignments,
+        data: {
+          'territory_id': territoryId,
+          'territory_solid': territorySolid,
+          'assigned_worker_id': workerId,
+          'team_id': teamId,
+          'assigned_by': assignedBy,
+          'priority': priority,
+          if (notes != null && notes.isNotEmpty) 'notes': notes,
+        },
+      );
+
+      final dynamic data = response.data is Map<String, dynamic> &&
+              response.data['assignment'] != null
+          ? response.data['assignment']
+          : response.data;
+      final assignment = TerritoryAssignment.fromJson(data);
+      return ApiResult.success(assignment);
+    } on DioException catch (e) {
+      if (e.response?.data != null) {
+        final responseData = e.response!.data;
+        if (responseData is Map && responseData['error'] != null) {
+          final apiError = responseData['error'].toString();
+          if (apiError.contains('duplicate key') ||
+              apiError.contains('already assigned') ||
+              apiError.contains('unique constraint')) {
+            return const ApiResult.failure(
+              'This territory is already assigned to your team. To reassign it to a different light squad, please update the existing assignment.',
+            );
+          }
+          return ApiResult.failure(apiError);
+        }
+      }
+      return ApiResult.failure(_handleDioError(e));
+    } catch (e) {
+      return ApiResult.failure('Failed to assign territory: $e');
+    }
+  }
+
+  // Alias for assignTerritoryToWorker
+  Future<ApiResult<TerritoryAssignment>> assignTerritoryToUser({
+    required String territoryId,
+    required String territorySolid,
+    required String userId,
+    required String teamId,
+    required String assignedBy,
+    String priority = 'medium',
+    String? notes,
+  }) =>
+      assignTerritoryToWorker(
+        territoryId: territoryId,
+        territorySolid: territorySolid,
+        workerId: userId,
+        teamId: teamId,
+        assignedBy: assignedBy,
+        priority: priority,
+        notes: notes,
+      );
+
   // Complete territory assignment
   Future<ApiResult<TerritoryAssignment>> completeAssignment({
     required String assignmentId,

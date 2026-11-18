@@ -113,6 +113,18 @@ class TerritoryAssignToWorker extends TerritoryEvent {
   List<Object?> get props => [territoryId, territorySolid, workerId, teamId, assignedBy, priority, notes];
 }
 
+class TerritoryAssignToUser extends TerritoryAssignToWorker {
+  const TerritoryAssignToUser({
+    required super.territoryId,
+    required super.territorySolid,
+    required String userId,
+    required super.teamId,
+    required super.assignedBy,
+    super.priority = 'medium',
+    super.notes,
+  }) : super(workerId: userId);
+}
+
 /// Event to load territories allocated to the current team leader by admin
 class TerritoryLoadMyAllocations extends TerritoryEvent {
   const TerritoryLoadMyAllocations();

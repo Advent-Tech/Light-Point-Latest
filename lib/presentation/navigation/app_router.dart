@@ -388,6 +388,10 @@ class AppRouter {
               'territories' => cc.MapMode.territories,
               _ => cc.MapMode.overview,
             };
+            final preSelectedWorkerId =
+                state.uri.queryParameters['preSelectedWorkerId'];
+            final preSelectedWorkerName =
+                state.uri.queryParameters['preSelectedWorkerName'];
             return AppPageTransitions.slide(
               key: state.pageKey,
               child: MultiBlocProvider(
@@ -400,7 +404,11 @@ class AppRouter {
                   ),
                   BlocProvider(create: (_) => WorkerTrackingBloc()),
                 ],
-                child: CommandCenterScreen(initialMode: initialMode),
+                child: CommandCenterScreen(
+                  initialMode: initialMode,
+                  preSelectedWorkerId: preSelectedWorkerId,
+                  preSelectedWorkerName: preSelectedWorkerName,
+                ),
               ),
             );
           },

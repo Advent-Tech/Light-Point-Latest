@@ -27,8 +27,15 @@ import 'widgets/worker_bottom_sheet.dart';
 
 class CommandCenterScreen extends StatefulWidget {
   final cc.MapMode? initialMode;
+  final String? preSelectedWorkerId;
+  final String? preSelectedWorkerName;
 
-  const CommandCenterScreen({super.key, this.initialMode});
+  const CommandCenterScreen({
+    super.key,
+    this.initialMode,
+    this.preSelectedWorkerId,
+    this.preSelectedWorkerName,
+  });
 
   @override
   State<CommandCenterScreen> createState() => _CommandCenterScreenState();
@@ -390,7 +397,10 @@ class _CommandCenterScreenState extends State<CommandCenterScreen> {
                         tooltipBackgroundColor: tooltipBg,
                         titleTextStyle: tooltipTitleStyle,
                         descTextStyle: tooltipDescStyle,
-                        child: const TerritoryBottomSheet(),
+                        child: TerritoryBottomSheet(
+                          preSelectedWorkerId: widget.preSelectedWorkerId,
+                          preSelectedWorkerName: widget.preSelectedWorkerName,
+                        ),
                       ),
 
                     // Empty state overlay

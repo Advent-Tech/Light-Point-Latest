@@ -2,7 +2,10 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:lightpoint/core/network/api_result.dart';
+
 import '../../../data/models/territory_model.dart';
+import '../../../data/repositories/territory_repository.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/storage/local_storage.dart';
@@ -11,12 +14,15 @@ part 'territory_event.dart';
 part 'territory_state.dart';
 
 class TerritoryBloc extends Bloc<TerritoryEvent, TerritoryState> {
+  final TerritoryRepository? _repository;
   ApiClient? _apiClient;
   LocalStorage? _localStorage;
   bool _isInitialized = false;
   CancelToken? _searchCancelToken;
 
-  TerritoryBloc() : super(TerritoryInitial()) {
+  TerritoryBloc({TerritoryRepository? repository})
+    : _repository = repository,
+      super(TerritoryInitial()) {
     on<TerritoryLoadAssignments>(_onLoadAssignments);
     on<TerritoryLoadAvailable>(_onLoadAvailable);
     on<TerritorySearch>(_onSearch);
@@ -39,6 +45,8 @@ class TerritoryBloc extends Bloc<TerritoryEvent, TerritoryState> {
   // Getters that assert initialization
   ApiClient get _api => _apiClient!;
   LocalStorage get _local => _localStorage!;
+  TerritoryRepository get _territoryRepository =>
+      _repository ?? TerritoryRepository(apiClient: _apiClient);
 
   Future<void> _onLoadAssignments(
     TerritoryLoadAssignments event,
@@ -55,11 +63,13 @@ class TerritoryBloc extends Bloc<TerritoryEvent, TerritoryState> {
 
       if (workerId == null) {
         // No worker ID available, return empty list
-        emit(const TerritoryAssignmentsLoaded(
-          assignments: [],
-          activeCount: 0,
-          completedCount: 0,
-        ));
+        emit(
+          const TerritoryAssignmentsLoaded(
+            assignments: [],
+            activeCount: 0,
+            completedCount: 0,
+          ),
+        );
         return;
       }
 
@@ -68,43 +78,57 @@ class TerritoryBloc extends Bloc<TerritoryEvent, TerritoryState> {
         queryParameters: {'worker_id': workerId},
       );
       if (response.statusCode == 200) {
-        final List<dynamic> data = response.data is List ? response.data : response.data['assignments'] ?? [];
-        final assignments = data.map((json) => TerritoryAssignment.fromJson(json)).toList();
+        final List<dynamic> data = response.data is List
+            ? response.data
+            : response.data['assignments'] ?? [];
+        final assignments = data
+            .map((json) => TerritoryAssignment.fromJson(json))
+            .toList();
 
         // Cache for offline
         await _local.saveTerritoryAssignments(data);
 
-        emit(TerritoryAssignmentsLoaded(
-          assignments: assignments,
-          activeCount: assignments.where((a) => a.isActive).length,
-          completedCount: assignments.where((a) => a.isCompleted).length,
-        ));
+        emit(
+          TerritoryAssignmentsLoaded(
+            assignments: assignments,
+            activeCount: assignments.where((a) => a.isActive).length,
+            completedCount: assignments.where((a) => a.isCompleted).length,
+          ),
+        );
       } else {
         // Return empty list instead of error
-        emit(const TerritoryAssignmentsLoaded(
-          assignments: [],
-          activeCount: 0,
-          completedCount: 0,
-        ));
+        emit(
+          const TerritoryAssignmentsLoaded(
+            assignments: [],
+            activeCount: 0,
+            completedCount: 0,
+          ),
+        );
       }
     } catch (e) {
       // Try loading from cache first
       final cached = _localStorage?.getTerritoryAssignments();
       if (cached != null && cached.isNotEmpty) {
-        final assignments = cached.map((json) => TerritoryAssignment.fromJson(json)).toList();
-        emit(TerritoryAssignmentsLoaded(
-          assignments: assignments,
-          activeCount: assignments.where((a) => a.isActive).length,
-          completedCount: assignments.where((a) => a.isCompleted).length,
-          isOffline: true,
-        ));
+        final assignments = cached
+            .map((json) => TerritoryAssignment.fromJson(json))
+            .toList();
+        emit(
+          TerritoryAssignmentsLoaded(
+            assignments: assignments,
+            activeCount: assignments.where((a) => a.isActive).length,
+            completedCount: assignments.where((a) => a.isCompleted).length,
+            isOffline: true,
+          ),
+        );
       } else {
         // Return empty list instead of error to prevent UI crashes
-        emit(const TerritoryAssignmentsLoaded(
-          assignments: [],
-          activeCount: 0,
-          completedCount: 0,
-        ));
+        emit(
+          const TerritoryAssignmentsLoaded(
+            assignments: [],
+            activeCount: 0,
+            completedCount: 0,
+          ),
+        );
       }
     }
   }
@@ -142,13 +166,23 @@ class TerritoryBloc extends Bloc<TerritoryEvent, TerritoryState> {
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = response.data is List ? response.data : response.data['territories'] ?? [];
-        final newTerritories = data.map((json) => GeoTerritory.fromJson(json)).toList();
-        final total = response.data is Map ? response.data['total'] ?? newTerritories.length : newTerritories.length;
+        final List<dynamic> data = response.data is List
+            ? response.data
+            : response.data['territories'] ?? [];
+        final newTerritories = data
+            .map((json) => GeoTerritory.fromJson(json))
+            .toList();
+        final total = response.data is Map
+            ? response.data['total'] ?? newTerritories.length
+            : newTerritories.length;
 
         // Debug: Check if geometry is being returned
-        final withGeometry = newTerritories.where((t) => t.geometry != null).length;
-        debugPrint('Territories loaded: ${newTerritories.length}, with geometry: $withGeometry');
+        final withGeometry = newTerritories
+            .where((t) => t.geometry != null)
+            .length;
+        debugPrint(
+          'Territories loaded: ${newTerritories.length}, with geometry: $withGeometry',
+        );
 
         // If appending (offset > 0), merge with existing
         List<GeoTerritory> allTerritories = newTerritories;
@@ -157,12 +191,14 @@ class TerritoryBloc extends Bloc<TerritoryEvent, TerritoryState> {
           allTerritories = [...currentState.territories, ...newTerritories];
         }
 
-        emit(TerritoryAvailableLoaded(
-          territories: allTerritories,
-          hasMore: newTerritories.length == event.limit,
-          total: total,
-          currentOffset: event.offset + newTerritories.length,
-        ));
+        emit(
+          TerritoryAvailableLoaded(
+            territories: allTerritories,
+            hasMore: newTerritories.length == event.limit,
+            total: total,
+            currentOffset: event.offset + newTerritories.length,
+          ),
+        );
       } else {
         emit(TerritoryError(message: 'Failed to load available territories'));
       }
@@ -199,9 +235,15 @@ class TerritoryBloc extends Bloc<TerritoryEvent, TerritoryState> {
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = response.data is List ? response.data : response.data['territories'] ?? [];
-        final newTerritories = data.map((json) => GeoTerritory.fromJson(json)).toList();
-        final total = response.data is Map ? response.data['total'] ?? newTerritories.length : newTerritories.length;
+        final List<dynamic> data = response.data is List
+            ? response.data
+            : response.data['territories'] ?? [];
+        final newTerritories = data
+            .map((json) => GeoTerritory.fromJson(json))
+            .toList();
+        final total = response.data is Map
+            ? response.data['total'] ?? newTerritories.length
+            : newTerritories.length;
 
         // If paginating (offset > 0), merge with existing results
         List<GeoTerritory> allTerritories = newTerritories;
@@ -212,12 +254,14 @@ class TerritoryBloc extends Bloc<TerritoryEvent, TerritoryState> {
           }
         }
 
-        emit(TerritorySearchResults(
-          territories: allTerritories,
-          query: event.query,
-          hasMore: newTerritories.length == event.limit,
-          total: total,
-        ));
+        emit(
+          TerritorySearchResults(
+            territories: allTerritories,
+            query: event.query,
+            hasMore: newTerritories.length == event.limit,
+            total: total,
+          ),
+        );
       } else {
         emit(TerritoryError(message: 'Search failed'));
       }
@@ -250,9 +294,11 @@ class TerritoryBloc extends Bloc<TerritoryEvent, TerritoryState> {
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        emit(TerritoryRequestSuccess(
-          message: 'Territory request submitted successfully',
-        ));
+        emit(
+          TerritoryRequestSuccess(
+            message: 'Territory request submitted successfully',
+          ),
+        );
         // Reload assignments
         add(const TerritoryLoadAssignments());
       } else {
@@ -272,62 +318,29 @@ class TerritoryBloc extends Bloc<TerritoryEvent, TerritoryState> {
     try {
       await _initialize();
 
-      final response = await _api.post(
-        ApiConstants.assignments,
-        data: {
-          'territory_id': event.territoryId,
-          'territory_solid': event.territorySolid,
-          'assigned_worker_id': event.workerId,
-          'team_id': event.teamId,
-          'assigned_by': event.assignedBy,
-          'priority': event.priority,
-          if (event.notes != null) 'notes': event.notes,
-        },
+      final result = await _territoryRepository.assignTerritoryToWorker(
+        territoryId: event.territoryId,
+        territorySolid: event.territorySolid,
+        workerId: event.workerId,
+        teamId: event.teamId,
+        assignedBy: event.assignedBy,
+        priority: event.priority,
+        notes: event.notes,
       );
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        emit(const TerritoryAssignSuccess(
-          message: 'Territory assigned successfully',
-        ));
+      if (result.isSuccess) {
+        emit(
+          const TerritoryAssignSuccess(
+            message: 'Territory assigned successfully',
+          ),
+        );
       } else {
-        // Check for duplicate assignment error in response
-        final errorMessage = response.data is Map
-            ? response.data['error']?.toString() ?? 'Failed to assign territory'
-            : 'Failed to assign territory';
-
-        if (errorMessage.contains('duplicate key') ||
-            errorMessage.contains('already assigned') ||
-            errorMessage.contains('unique constraint')) {
-          emit(const TerritoryError(
-            message: 'This territory is already assigned to your team. To reassign it to a different light squad, please update the existing assignment.',
-          ));
-        } else {
-          emit(TerritoryError(message: errorMessage));
-        }
+        emit(
+          TerritoryError(
+            message: result.errorMessage ?? 'Failed to assign territory',
+          ),
+        );
       }
-    } on DioException catch (e) {
-      // Parse the error response for duplicate key constraint
-      String errorMessage = 'Failed to assign territory';
-
-      if (e.response?.data != null) {
-        final responseData = e.response!.data;
-        if (responseData is Map && responseData['error'] != null) {
-          final apiError = responseData['error'].toString();
-
-          // Check for duplicate key / unique constraint error
-          if (apiError.contains('duplicate key') ||
-              apiError.contains('already assigned') ||
-              apiError.contains('unique constraint')) {
-            errorMessage = 'This territory is already assigned to your team. To reassign it to a different light squad, please update the existing assignment.';
-          } else {
-            errorMessage = apiError;
-          }
-        }
-      } else if (e.message != null) {
-        errorMessage = e.message!;
-      }
-
-      emit(TerritoryError(message: errorMessage));
     } catch (e) {
       emit(TerritoryError(message: e.toString()));
     }
@@ -353,14 +366,20 @@ class TerritoryBloc extends Bloc<TerritoryEvent, TerritoryState> {
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = response.data is List ? response.data : response.data['territories'] ?? [];
-        final territories = data.map((json) => GeoTerritory.fromJson(json)).toList();
+        final List<dynamic> data = response.data is List
+            ? response.data
+            : response.data['territories'] ?? [];
+        final territories = data
+            .map((json) => GeoTerritory.fromJson(json))
+            .toList();
 
-        emit(TerritoryNearbyLoaded(
-          territories: territories,
-          latitude: event.latitude,
-          longitude: event.longitude,
-        ));
+        emit(
+          TerritoryNearbyLoaded(
+            territories: territories,
+            latitude: event.latitude,
+            longitude: event.longitude,
+          ),
+        );
       } else {
         emit(TerritoryError(message: 'Failed to load nearby territories'));
       }
@@ -379,7 +398,9 @@ class TerritoryBloc extends Bloc<TerritoryEvent, TerritoryState> {
       final response = await _api.get(ApiConstants.unionStats);
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = response.data is List ? response.data : response.data['unions'] ?? [];
+        final List<dynamic> data = response.data is List
+            ? response.data
+            : response.data['unions'] ?? [];
         final stats = data.map((json) => UnionStats.fromJson(json)).toList();
 
         emit(TerritoryUnionStatsLoaded(stats: stats));
@@ -405,8 +426,12 @@ class TerritoryBloc extends Bloc<TerritoryEvent, TerritoryState> {
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = response.data is List ? response.data : response.data['churches'] ?? [];
-        final churches = data.map((json) => ChurchLocation.fromJson(json)).toList();
+        final List<dynamic> data = response.data is List
+            ? response.data
+            : response.data['churches'] ?? [];
+        final churches = data
+            .map((json) => ChurchLocation.fromJson(json))
+            .toList();
 
         emit(TerritoryChurchesLoaded(churches: churches));
       }
@@ -434,15 +459,15 @@ class TerritoryBloc extends Bloc<TerritoryEvent, TerritoryState> {
 
       final response = await _api.get(
         ApiConstants.myTerritoryAllocations,
-        queryParameters: {
-          'include_geometry': true,
-        },
+        queryParameters: {'include_geometry': true},
       );
 
       if (response.statusCode == 200) {
         final List<dynamic> data = response.data is List
             ? response.data
-            : response.data['allocations'] ?? response.data['territories'] ?? [];
+            : response.data['allocations'] ??
+                  response.data['territories'] ??
+                  [];
 
         debugPrint('Allocation response: ${data.length} items');
 
@@ -461,7 +486,10 @@ class TerritoryBloc extends Bloc<TerritoryEvent, TerritoryState> {
             } else {
               // Map allocation fields to GeoTerritory fields
               final territoryJson = <String, dynamic>{
-                'id': json['territory_id']?.toString() ?? json['id']?.toString() ?? '',
+                'id':
+                    json['territory_id']?.toString() ??
+                    json['id']?.toString() ??
+                    '',
                 'solid': json['territory_solid'] ?? json['solid'] ?? '',
                 'entity_name': json['entity_name'] ?? '',
                 'entity_id': json['entity_id'] ?? '',
@@ -490,19 +518,19 @@ class TerritoryBloc extends Bloc<TerritoryEvent, TerritoryState> {
 
         debugPrint('Leader allocations loaded: ${territories.length}');
 
-        emit(TerritoryAllocationsLoaded(
-          territories: territories,
-          total: total,
-        ));
+        emit(
+          TerritoryAllocationsLoaded(territories: territories, total: total),
+        );
       } else {
-        emit(const TerritoryAllocationsLoaded(
-          territories: [],
-          total: 0,
-        ));
+        emit(const TerritoryAllocationsLoaded(territories: [], total: 0));
       }
     } catch (e) {
       debugPrint('Error loading leader allocations: $e');
-      emit(TerritoryError(message: 'Failed to load allocated territories: ${e.toString()}'));
+      emit(
+        TerritoryError(
+          message: 'Failed to load allocated territories: ${e.toString()}',
+        ),
+      );
     }
   }
 }

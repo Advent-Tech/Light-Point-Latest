@@ -29,11 +29,17 @@ class _LeaderTargetsScreenState extends State<LeaderTargetsScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(_onTabChanged);
     _loadData();
+  }
+
+  void _onTabChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     super.dispose();
   }
@@ -93,7 +99,13 @@ class _LeaderTargetsScreenState extends State<LeaderTargetsScreen>
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.add),
+            tooltip: 'Create Target',
+            onPressed: _showCreateTargetDialog,
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
             onPressed: () {
               setState(() => _isLoading = true);
               _loadData();
@@ -101,13 +113,18 @@ class _LeaderTargetsScreenState extends State<LeaderTargetsScreen>
           ),
         ],
       ),
-      floatingActionButton: _tabController.index == 1
-          ? FloatingActionButton(
-              onPressed: _showCreateTargetDialog,
-              backgroundColor: AppColors.primary,
-              child: const Icon(Icons.add),
-            )
-          : null,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showCreateTargetDialog,
+        backgroundColor: AppColors.primary,
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: Text(
+          _tabController.index == 1 ? 'New Template' : 'New Target',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -125,7 +142,26 @@ class _LeaderTargetsScreenState extends State<LeaderTargetsScreen>
         isDark,
         icon: Icons.analytics_outlined,
         title: 'No Assigned Targets',
-        subtitle: 'Assign targets to a team or light squad',
+        subtitle: 'Assign targets to your team or individual light squads',
+        action: ElevatedButton.icon(
+          onPressed: () {
+            if (_templates.isEmpty) {
+              _showCreateTargetDialog();
+            } else {
+              _tabController.animateTo(1);
+            }
+          },
+          icon: Icon(_templates.isEmpty ? Icons.add : Icons.arrow_forward),
+          label: Text(
+            _templates.isEmpty ? 'Create First Target' : 'View Templates to Assign',
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
       );
     }
 
@@ -139,7 +175,7 @@ class _LeaderTargetsScreenState extends State<LeaderTargetsScreen>
           return _AssignedTargetCard(
             item: item,
             isDark: isDark,
-            onRemove: () => _confirmRemoveAssignment(item.assignment.id),
+            onRemove: () => _confirmRemoveAssignment(item),
           );
         },
       ),
@@ -152,7 +188,18 @@ class _LeaderTargetsScreenState extends State<LeaderTargetsScreen>
         isDark,
         icon: Icons.flag_outlined,
         title: 'No Templates',
-        subtitle: 'Create a target template, then assign it',
+        subtitle: 'Create a target template, then assign it to team members',
+        action: ElevatedButton.icon(
+          onPressed: _showCreateTargetDialog,
+          icon: const Icon(Icons.add),
+          label: const Text('Create Target Template'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
       );
     }
 
@@ -180,27 +227,40 @@ class _LeaderTargetsScreenState extends State<LeaderTargetsScreen>
     required IconData icon,
     required String title,
     required String subtitle,
+    Widget? action,
   }) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 64, color: AppColors.navyBlue.withOpacity(0.5)),
-          const SizedBox(height: 16),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppColors.navyBlue,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 64, color: AppColors.navyBlue.withOpacity(0.5)),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : AppColors.navyBlue,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            subtitle,
-            style: TextStyle(color: AppColors.navyBlue.withOpacity(0.7)),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.navyBlue.withOpacity(0.7),
+              ),
+            ),
+            if (action != null) ...[
+              const SizedBox(height: 20),
+              action,
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -537,12 +597,14 @@ class _LeaderTargetsScreenState extends State<LeaderTargetsScreen>
                   : await _targetsRepository.assignTargetToWorker(
                       targetId: target.id,
                       workerId: selectedWorker!.id,
+                      teamId: resolvedTeamId,
                     );
 
               if (!mounted) return;
 
               if (res.isSuccess) {
                 Navigator.of(context).pop();
+                _tabController.animateTo(0);
                 await _reloadAfterMutation();
               } else {
                 setState(() {
@@ -664,7 +726,7 @@ class _LeaderTargetsScreenState extends State<LeaderTargetsScreen>
     }
   }
 
-  Future<void> _confirmRemoveAssignment(String assignmentId) async {
+  Future<void> _confirmRemoveAssignment(AssignedTargetWithProgress item) async {
     final ok =
         await showDialog<bool>(
           context: context,
@@ -688,7 +750,12 @@ class _LeaderTargetsScreenState extends State<LeaderTargetsScreen>
         false;
 
     if (!ok) return;
-    final res = await _targetsRepository.deleteAssignment(assignmentId);
+    final res = await _targetsRepository.deleteAssignment(
+      assignmentId: item.assignment.id,
+      targetId: item.assignment.target?.id,
+      assignedToType: item.assignment.assignedToType,
+      assignedToId: item.assignment.assignedToId,
+    );
     if (!mounted) return;
     if (res.isSuccess) {
       await _reloadAfterMutation();

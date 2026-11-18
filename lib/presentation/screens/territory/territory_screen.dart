@@ -1,9 +1,11 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:showcaseview/showcaseview.dart';
+
 import '../../../core/theme/theme.dart';
 import '../../../data/models/territory_model.dart';
 import '../../../services/coach_marks_service.dart';
@@ -124,8 +126,7 @@ class _TerritoryScreenState extends State<TerritoryScreen>
               Showcase(
                 key: _showcaseSearch,
                 title: 'Search Territories',
-                description:
-                    'Find territories by name or location. Results will appear on the map.',
+                description: 'Find territories by name or location. Results will appear on the map.',
                 titleTextStyle: _tooltipTitleStyle,
                 descTextStyle: _tooltipDescStyle,
                 tooltipBorderRadius: _tooltipRadius,
@@ -195,8 +196,7 @@ class _TerritoryScreenState extends State<TerritoryScreen>
           Showcase(
             key: _showcaseFab,
             title: 'Team Communication',
-            description:
-                'Tap to access Chat or Walkie-Talkie to communicate with your team in the field.',
+            description: 'Tap to access Chat or Walkie-Talkie to communicate with your team in the field.',
             titleTextStyle: _tooltipTitleStyle,
             descTextStyle: _tooltipDescStyle,
             tooltipBorderRadius: _tooltipRadius,
@@ -274,8 +274,7 @@ class _MyAreasTabState extends State<_MyAreasTab> {
             return EmptyState(
               icon: Icons.map_outlined,
               title: 'No Assigned Territories',
-              description:
-                  'You don\'t have any territories assigned yet.\nBrowse available territories to request one.',
+              description: 'You don\'t have any territories assigned yet.\nBrowse available territories to request one.',
               actionLabel: 'Browse Available',
               onAction: () {},
             );
@@ -341,8 +340,7 @@ class _MyAreasTabState extends State<_MyAreasTab> {
         return EmptyState(
           icon: Icons.map_outlined,
           title: 'No Assigned Territories',
-          description:
-              'You don\'t have any territories assigned yet.\nBrowse available territories to request one.',
+          description: 'You don\'t have any territories assigned yet.\nBrowse available territories to request one.',
           actionLabel: 'Browse Available',
           onAction: () {},
         );
@@ -955,9 +953,8 @@ class _MapTabState extends State<_MapTab> {
               const SizedBox(height: 16),
               Text(
                 'Visit Outcome',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                style: Theme.of(context).textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               Wrap(
@@ -1057,8 +1054,7 @@ class _MapTabState extends State<_MapTab> {
     return EmptyState(
       icon: Icons.map,
       title: 'No Territories to Display',
-      description:
-          'No territories assigned to you yet.\nCheck the My Areas tab for details.',
+      description: 'No territories assigned to you yet.\nCheck the My Areas tab for details.',
       iconColor: AppColors.secondary,
       actionLabel: 'Load Territories',
       onAction: _loadMapData,
@@ -1273,6 +1269,9 @@ void _showTerritoryDetailSheet(
                               onPressed: isLoading
                                   ? null
                                   : () {
+                                      debugPrint(
+                                        'Starting work session for territory ${territory.id}',
+                                      );
                                       context.read<WorkSessionBloc>().add(
                                         WorkSessionCheckIn(
                                           territoryId: territory.id,

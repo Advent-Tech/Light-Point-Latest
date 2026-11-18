@@ -1,3 +1,5 @@
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../../../data/models/delivery_model.dart';
@@ -152,9 +154,12 @@ class DeliveryBloc extends Bloc<DeliveryEvent, DeliveryState> {
     try {
       await _initialize();
 
+      final payload = event.request.toJson();
+      debugPrint('[DeliveryBloc] Submitting delivery payload: $payload');
+
       final response = await _apiClient!.post(
         ApiConstants.deliveriesCreate,
-        data: event.request.toJson(),
+        data: payload,
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -165,10 +170,28 @@ class DeliveryBloc extends Bloc<DeliveryEvent, DeliveryState> {
         // Reload list
         add(const DeliveryLoadList());
       } else {
-        emit(DeliveryError(message: 'Failed to create delivery'));
+        emit(const DeliveryError(message: 'Failed to create delivery'));
       }
     } catch (e) {
-      emit(DeliveryError(message: e.toString()));
+      String message = 'Failed to create delivery';
+      if (e is DioException) {
+        final data = e.response?.data;
+        if (data is Map) {
+          message = data['error']?.toString() ??
+              data['message']?.toString() ??
+              data['detail']?.toString() ??
+              'Server error (${e.response?.statusCode})';
+        } else if (data is String && data.isNotEmpty) {
+          message = data;
+        } else {
+          message = 'Server error (${e.response?.statusCode})';
+        }
+        debugPrint(
+            '[DeliveryBloc] _onCreate DioException (${e.response?.statusCode}): $message, raw: $data');
+      } else {
+        message = e.toString();
+      }
+      emit(DeliveryError(message: message));
     }
   }
 

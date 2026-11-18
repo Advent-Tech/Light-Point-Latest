@@ -3,9 +3,17 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../command_center_bloc.dart';
 import '../command_center_event.dart';
 import '../command_center_state.dart';
+import 'assign_territory_dialog.dart';
 
 class TerritoryBottomSheet extends StatefulWidget {
-  const TerritoryBottomSheet({super.key});
+  final String? preSelectedWorkerId;
+  final String? preSelectedWorkerName;
+
+  const TerritoryBottomSheet({
+    super.key,
+    this.preSelectedWorkerId,
+    this.preSelectedWorkerName,
+  });
 
   @override
   State<TerritoryBottomSheet> createState() => _TerritoryBottomSheetState();
@@ -157,6 +165,40 @@ class _TerritoryBottomSheetState extends State<TerritoryBottomSheet> {
                       ),
                     ),
 
+                    // Preselected worker banner
+                    if (widget.preSelectedWorkerName != null)
+                      Container(
+                        margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.person_pin_circle_outlined,
+                              size: 18,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Assigning for ${widget.preSelectedWorkerName} — select a territory below',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
                     // Territory list
                     Expanded(
                       child: BlocBuilder<CommandCenterBloc, CommandCenterState>(
@@ -217,115 +259,173 @@ class _TerritoryBottomSheetState extends State<TerritoryBottomSheet> {
                                                 context,
                                               ).colorScheme.surface,
                                       ),
-                                      child: Row(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Container(
-                                            width: 40,
-                                            height: 40,
-                                            decoration: BoxDecoration(
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .primary
-                                                  .withValues(alpha: 0.10),
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                            ),
-                                            child: Icon(
-                                              territory.solid.toLowerCase() ==
-                                                      'true'
-                                                  ? Icons.layers
-                                                  : Icons.layers_outlined,
-                                              color: Theme.of(
-                                                context,
-                                              ).colorScheme.primary,
-                                              size: 20,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  title,
-                                                  maxLines: 2,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: TextStyle(
-                                                    fontWeight: isSelected
-                                                        ? FontWeight.w700
-                                                        : FontWeight.w600,
-                                                    fontSize: 16,
-                                                    height: 1.25,
-                                                  ),
+                                          Row(
+                                            children: [
+                                              Container(
+                                                width: 40,
+                                                height: 40,
+                                                decoration: BoxDecoration(
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .primary
+                                                      .withValues(alpha: 0.10),
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
                                                 ),
-                                                const SizedBox(height: 6),
-                                                Row(
+                                                child: Icon(
+                                                  territory.solid.toLowerCase() ==
+                                                          'true'
+                                                      ? Icons.layers
+                                                      : Icons.layers_outlined,
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).colorScheme.primary,
+                                                  size: 20,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
                                                   children: [
-                                                    Container(
-                                                      padding:
-                                                          const EdgeInsets.symmetric(
-                                                            horizontal: 8,
-                                                            vertical: 3,
-                                                          ),
-                                                      decoration: BoxDecoration(
-                                                        color: Theme.of(context)
-                                                            .colorScheme
-                                                            .primary
-                                                            .withValues(
-                                                              alpha: 0.09,
-                                                            ),
-                                                        borderRadius:
-                                                            BorderRadius.circular(
-                                                              99,
-                                                            ),
-                                                      ),
-                                                      child: Text(
-                                                        '$units Units',
-                                                        style: Theme.of(context)
-                                                            .textTheme
-                                                            .labelSmall
-                                                            ?.copyWith(
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w600,
-                                                            ),
+                                                    Text(
+                                                      title,
+                                                      maxLines: 2,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                        fontWeight: isSelected
+                                                            ? FontWeight.w700
+                                                            : FontWeight.w600,
+                                                        fontSize: 16,
+                                                        height: 1.25,
                                                       ),
                                                     ),
-                                                    const SizedBox(width: 8),
-                                                    Text(
-                                                      '#$shortId',
-                                                      style: Theme.of(context)
-                                                          .textTheme
-                                                          .bodySmall
-                                                          ?.copyWith(
-                                                            color:
-                                                                Theme.of(
-                                                                      context,
-                                                                    )
-                                                                    .textTheme
-                                                                    .bodySmall
-                                                                    ?.color
-                                                                    ?.withValues(
-                                                                      alpha:
-                                                                          0.65,
-                                                                    ),
+                                                    const SizedBox(height: 6),
+                                                    Row(
+                                                      children: [
+                                                        Container(
+                                                          padding:
+                                                              const EdgeInsets.symmetric(
+                                                                horizontal: 8,
+                                                                vertical: 3,
+                                                              ),
+                                                          decoration: BoxDecoration(
+                                                            color: Theme.of(context)
+                                                                .colorScheme
+                                                                .primary
+                                                                .withValues(
+                                                                  alpha: 0.09,
+                                                                ),
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  99,
+                                                                ),
                                                           ),
+                                                          child: Text(
+                                                            '$units Units',
+                                                            style: Theme.of(context)
+                                                                .textTheme
+                                                                .labelSmall
+                                                                ?.copyWith(
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w600,
+                                                                ),
+                                                          ),
+                                                        ),
+                                                        const SizedBox(width: 8),
+                                                        Text(
+                                                          '#$shortId',
+                                                          style: Theme.of(context)
+                                                              .textTheme
+                                                              .bodySmall
+                                                              ?.copyWith(
+                                                                color:
+                                                                    Theme.of(
+                                                                          context,
+                                                                        )
+                                                                        .textTheme
+                                                                        .bodySmall
+                                                                        ?.color
+                                                                        ?.withValues(
+                                                                          alpha:
+                                                                              0.65,
+                                                                        ),
+                                                              ),
+                                                        ),
+                                                      ],
                                                     ),
                                                   ],
                                                 ),
+                                              ),
+                                              IconButton(
+                                                icon: const Icon(Icons.person_add_alt_1_outlined, size: 20),
+                                                tooltip: 'Assign territory',
+                                                color: Theme.of(context).colorScheme.primary,
+                                                onPressed: () {
+                                                  showAssignTerritoryDialog(
+                                                    context: context,
+                                                    territory: territory,
+                                                    workers: state.workers,
+                                                    preSelectedWorkerId: widget.preSelectedWorkerId,
+                                                    onAssigned: () {
+                                                      context.read<CommandCenterBloc>().add(RefreshDataEvent());
+                                                    },
+                                                  );
+                                                },
+                                              ),
+                                              if (isSelected)
+                                                Icon(
+                                                  Icons.check_circle,
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).colorScheme.primary,
+                                                  size: 20,
+                                                ),
+                                            ],
+                                          ),
+                                          if (isSelected) ...[
+                                            const SizedBox(height: 12),
+                                            const Divider(height: 1),
+                                            const SizedBox(height: 10),
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.end,
+                                              children: [
+                                                FilledButton.icon(
+                                                  style: FilledButton.styleFrom(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                                    visualDensity: VisualDensity.compact,
+                                                    shape: RoundedRectangleBorder(
+                                                      borderRadius: BorderRadius.circular(10),
+                                                    ),
+                                                  ),
+                                                  onPressed: () {
+                                                    showAssignTerritoryDialog(
+                                                      context: context,
+                                                      territory: territory,
+                                                      workers: state.workers,
+                                                      preSelectedWorkerId: widget.preSelectedWorkerId,
+                                                      onAssigned: () {
+                                                        context.read<CommandCenterBloc>().add(RefreshDataEvent());
+                                                      },
+                                                    );
+                                                  },
+                                                  icon: const Icon(Icons.person_add_alt_1, size: 16),
+                                                  label: Text(
+                                                    widget.preSelectedWorkerName != null
+                                                        ? 'Assign to ${widget.preSelectedWorkerName}'
+                                                        : 'Assign to Squad Member',
+                                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                                  ),
+                                                ),
                                               ],
                                             ),
-                                          ),
-                                          if (isSelected)
-                                            Icon(
-                                              Icons.check_circle,
-                                              color: Theme.of(
-                                                context,
-                                              ).colorScheme.primary,
-                                              size: 20,
-                                            ),
+                                          ],
                                         ],
                                       ),
                                     ),
