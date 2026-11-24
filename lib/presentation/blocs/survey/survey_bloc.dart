@@ -79,6 +79,7 @@ class SurveyBloc extends Bloc<SurveyEvent, SurveyState> {
   }
 
   Future<void> _onSubmit(SurveySubmit event, Emitter<SurveyState> emit) async {
+    final previousState = state;
     emit(SurveySubmitting());
 
     final answers = <AnswerInput>[];
@@ -115,7 +116,9 @@ class SurveyBloc extends Bloc<SurveyEvent, SurveyState> {
         add(const SurveyRefresh());
       },
       failure: (message, statusCode) {
-        emit(SurveyError(message: message));
+        emit(SurveySubmitFailure(message: message));
+        // Restore the list so the Surveys screen keeps showing its data.
+        if (previousState is SurveyLoaded) emit(previousState);
       },
     );
   }

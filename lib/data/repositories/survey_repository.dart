@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/network/api_client.dart';
+import '../../core/network/api_error.dart';
 import '../../core/network/api_result.dart';
 import '../models/survey_model.dart';
 
@@ -143,33 +144,45 @@ class SurveyRepository {
         data: request.toJson(),
       );
 
-      // Handle nested response structure from backend
+      // The server accepted the submission (2xx). From here on, never report
+      // failure because of an unexpected reply shape - that would make the
+      // user resubmit and create duplicate responses.
       // API returns: {"response": {...}, "answers": [...]}
-      final responseData = response.data;
-      Map<String, dynamic> surveyResponseData;
-
-      if (responseData is Map<String, dynamic>) {
-        if (responseData.containsKey('response')) {
-          // Nested structure - extract the response object
-          surveyResponseData = responseData['response'] as Map<String, dynamic>;
-          // Merge answers if provided separately
-          if (responseData.containsKey('answers')) {
-            surveyResponseData['answers'] = responseData['answers'];
+      try {
+        final responseData = response.data;
+        if (responseData is Map) {
+          final Map<String, dynamic> surveyResponseData;
+          if (responseData['response'] is Map) {
+            surveyResponseData =
+                Map<String, dynamic>.from(responseData['response'] as Map);
+            if (responseData.containsKey('answers')) {
+              surveyResponseData['answers'] = responseData['answers'];
+            }
+          } else {
+            surveyResponseData = Map<String, dynamic>.from(responseData);
           }
-        } else {
-          // Flat structure - use as is
-          surveyResponseData = responseData;
+          return ApiResult.success(SurveyResponse.fromJson(surveyResponseData));
         }
-      } else {
-        return ApiResult.failure('Invalid response format');
+      } catch (parseError) {
+        debugPrint('SurveyRepository: submitted OK but could not parse reply: $parseError');
       }
 
-      final surveyResponse = SurveyResponse.fromJson(surveyResponseData);
-      return ApiResult.success(surveyResponse);
+      return ApiResult.success(SurveyResponse(
+        id: '',
+        surveyId: request.surveyId,
+        territoryId: request.territoryId,
+        latitude: request.latitude,
+        longitude: request.longitude,
+        completedAt: DateTime.now(),
+      ));
     } on DioException catch (e) {
-      return ApiResult.failure(_handleDioError(e));
+      return ApiResult.failure(friendlyErrorMessage(
+        e,
+        fallback: 'Failed to submit survey. Please try again.',
+      ));
     } catch (e) {
-      return ApiResult.failure('Failed to submit survey: $e');
+      debugPrint('SurveyRepository: submit failed: $e');
+      return const ApiResult.failure('Failed to submit survey. Please try again.');
     }
   }
 

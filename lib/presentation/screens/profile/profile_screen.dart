@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/theme/theme_bloc.dart';
 import '../../blocs/profile/profile_bloc.dart';
+import '../../../core/network/api_result.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../data/repositories/auth_repository.dart';
 import '../../widgets/custom_button.dart';
 import 'privacy_policy_screen.dart';
 import 'about_screen.dart';
@@ -221,9 +223,14 @@ class _ProfileHeader extends StatelessWidget {
           ),
           // Edit Button
           IconButton(
-            onPressed: () {
-              // TODO: Edit profile
-            },
+            tooltip: 'Edit profile',
+            onPressed: () => showDialog(
+              context: context,
+              builder: (_) => BlocProvider.value(
+                value: context.read<AuthBloc>(),
+                child: _EditProfileDialog(initialName: name),
+              ),
+            ),
             icon: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
@@ -239,6 +246,134 @@ class _ProfileHeader extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _EditProfileDialog extends StatefulWidget {
+  final String initialName;
+
+  const _EditProfileDialog({required this.initialName});
+
+  @override
+  State<_EditProfileDialog> createState() => _EditProfileDialogState();
+}
+
+class _EditProfileDialogState extends State<_EditProfileDialog> {
+  late final TextEditingController _nameController;
+  final _formKey = GlobalKey<FormState>();
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(
+      text: widget.initialName == 'User' ? '' : widget.initialName,
+    );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! AuthAuthenticated) return;
+
+    final newName = _nameController.text.trim();
+    if (newName == authState.user.displayName) {
+      Navigator.pop(context);
+      return;
+    }
+
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+
+    final result = await AuthRepository().updateProfile(displayName: newName);
+    if (!mounted) return;
+
+    result.when(
+      success: (updated) {
+        // Merge onto the current user so fields the endpoint omits
+        // (role, team, etc.) are preserved.
+        final merged = authState.user.copyWith(
+          displayName: updated?.displayName ?? newName,
+        );
+        final messenger = ScaffoldMessenger.of(context);
+        context.read<AuthBloc>().add(AuthUpdateUser(user: merged));
+        Navigator.pop(context);
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Profile updated')),
+        );
+      },
+      failure: (message, _) {
+        setState(() {
+          _saving = false;
+          _error = message;
+        });
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit Profile'),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: _nameController,
+              autofocus: true,
+              enabled: !_saving,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Display name',
+                prefixIcon: Icon(Icons.person_outline),
+                border: OutlineInputBorder(),
+              ),
+              validator: (v) {
+                final value = v?.trim() ?? '';
+                if (value.isEmpty) return 'Name cannot be empty';
+                if (value.length < 2) return 'Name is too short';
+                return null;
+              },
+              onFieldSubmitted: (_) => _save(),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _error!,
+                style: const TextStyle(color: AppColors.error, fontSize: 13),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _saving ? null : _save,
+          child: _saving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Save'),
+        ),
+      ],
     );
   }
 }

@@ -20,6 +20,15 @@ subprojects {
     val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
+// mapbox_maps_flutter_mobile skips applying Kotlin on AGP 9+ (expects built-in Kotlin),
+// but android.builtInKotlin=false here, so apply the Kotlin plugin for it explicitly.
+subprojects {
+    if (name == "mapbox_maps_flutter_mobile") {
+        pluginManager.withPlugin("com.android.library") {
+            pluginManager.apply("org.jetbrains.kotlin.android")
+        }
+    }
+}
 subprojects {
     project.evaluationDependsOn(":app")
 }

@@ -228,11 +228,14 @@ class _SurveyFormScreenState extends State<SurveyFormScreen> {
           SuccessOverlay.show(context, message: 'Survey submitted!').then((_) {
             if (context.mounted) context.pop();
           });
-        } else if (state is SurveyError) {
+        } else if (state is SurveySubmitFailure || state is SurveyError) {
+          final message = state is SurveySubmitFailure
+              ? state.message
+              : (state as SurveyError).message;
           setState(() => _isSubmitting = false);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(state.message),
+              content: Text(message),
               backgroundColor: AppColors.error,
             ),
           );
