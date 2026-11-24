@@ -265,7 +265,8 @@ class SurveyResponse {
     if (json['answers'] != null) {
       if (json['answers'] is List) {
         answers = (json['answers'] as List)
-            .map((e) => SurveyAnswer.fromJson(e as Map<String, dynamic>))
+            .whereType<Map>()
+            .map((e) => SurveyAnswer.fromJson(Map<String, dynamic>.from(e)))
             .toList();
       } else if (json['answers'] is String) {
         // Backend sometimes returns answers as a JSON string
@@ -273,7 +274,8 @@ class SurveyResponse {
           final decoded = jsonDecode(json['answers'] as String);
           if (decoded is List) {
             answers = decoded
-                .map((e) => SurveyAnswer.fromJson(e as Map<String, dynamic>))
+                .whereType<Map>()
+                .map((e) => SurveyAnswer.fromJson(Map<String, dynamic>.from(e)))
                 .toList();
           }
         } catch (_) {
@@ -282,13 +284,16 @@ class SurveyResponse {
       }
     }
 
+    double? toDouble(dynamic v) =>
+        v is num ? v.toDouble() : (v == null ? null : double.tryParse(v.toString()));
+
     return SurveyResponse(
-      id: json['id'] as String,
-      surveyId: json['survey_id'] as String,
-      respondentId: json['respondent_id'] as String?,
-      territoryId: json['territory_id'] as String?,
-      latitude: (json['latitude'] as num?)?.toDouble(),
-      longitude: (json['longitude'] as num?)?.toDouble(),
+      id: json['id']?.toString() ?? '',
+      surveyId: json['survey_id']?.toString() ?? '',
+      respondentId: json['respondent_id']?.toString(),
+      territoryId: json['territory_id']?.toString(),
+      latitude: toDouble(json['latitude']),
+      longitude: toDouble(json['longitude']),
       completedAt: completedAt,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
@@ -327,16 +332,56 @@ class SurveyAnswer {
   });
 
   factory SurveyAnswer.fromJson(Map<String, dynamic> json) {
-    // Handle both full format and simplified format from JSON string
+    // Handle both full format and simplified format from JSON string.
+    // The backend may return list fields as real lists, JSON-encoded strings
+    // ("[\"a\",\"b\"]"), Postgres array literals ("{a,b}") or plain strings,
+    // so parse defensively instead of casting.
     return SurveyAnswer(
-      id: json['id'] as String? ?? '',
-      responseId: json['response_id'] as String? ?? '',
-      questionId: json['question_id'] as String? ?? '',
-      value: json['answer'] as String? ?? json['value'] as String?,
-      selectedOptions: (json['selected_options'] as List<dynamic>?)?.cast<String>(),
-      photoUrls: (json['photo_urls'] as List<dynamic>?)?.cast<String>(),
-      signatureUrl: json['signature_url'] as String?,
+      id: json['id']?.toString() ?? '',
+      responseId: json['response_id']?.toString() ?? '',
+      questionId: json['question_id']?.toString() ?? '',
+      value: (json['answer'] ?? json['value'])?.toString(),
+      selectedOptions: parseStringList(json['selected_options']),
+      photoUrls: parseStringList(json['photo_urls']),
+      signatureUrl: json['signature_url']?.toString(),
     );
+  }
+
+  /// Parses a value that should be a list of strings but may arrive as a
+  /// List, a JSON string, a Postgres array literal, or a single string.
+  static List<String>? parseStringList(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is List) {
+      return raw
+          .where((e) => e != null)
+          .map((e) => e.toString())
+          .where((e) => e.isNotEmpty)
+          .toList();
+    }
+    if (raw is String) {
+      final s = raw.trim();
+      if (s.isEmpty || s == 'null') return null;
+      if (s.startsWith('[')) {
+        try {
+          final decoded = jsonDecode(s);
+          if (decoded is List) return parseStringList(decoded);
+        } catch (_) {
+          // fall through
+        }
+      }
+      if (s.startsWith('{') && s.endsWith('}')) {
+        // Postgres text[] literal: {a,"b c"}
+        final inner = s.substring(1, s.length - 1);
+        if (inner.isEmpty) return <String>[];
+        return inner
+            .split(',')
+            .map((e) => e.trim().replaceAll(RegExp(r'^"|"$'), ''))
+            .where((e) => e.isNotEmpty)
+            .toList();
+      }
+      return [s];
+    }
+    return [raw.toString()];
   }
   Map<String, dynamic> toJson() => _$SurveyAnswerToJson(this);
 }

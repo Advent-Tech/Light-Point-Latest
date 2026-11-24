@@ -49,6 +49,17 @@ class SurveySubmitSuccess extends SurveyState {
   List<Object?> get props => [response];
 }
 
+/// Submission failed. Kept separate from [SurveyError] so the survey list
+/// screen doesn't replace its content with a full-page error.
+class SurveySubmitFailure extends SurveyState {
+  final String message;
+
+  const SurveySubmitFailure({required this.message});
+
+  @override
+  List<Object?> get props => [message];
+}
+
 class SurveyError extends SurveyState {
   final String message;
 

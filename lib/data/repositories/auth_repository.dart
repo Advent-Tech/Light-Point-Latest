@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/network/api_client.dart';
+import '../../core/network/api_error.dart';
 import '../../core/network/api_result.dart';
 import '../../core/storage/secure_storage.dart';
 import '../models/user_model.dart';
@@ -117,7 +118,7 @@ class AuthRepository {
     }
   }
 
-  Future<ApiResult<UserModel>> updateProfile({
+  Future<ApiResult<UserModel?>> updateProfile({
     String? displayName,
     String? avatarUrl,
     Map<String, dynamic>? metadata,
@@ -126,8 +127,16 @@ class AuthRepository {
       final client = await apiClient;
 
       final data = <String, dynamic>{};
-      if (displayName != null) data['displayName'] = displayName;
-      if (avatarUrl != null) data['avatarUrl'] = avatarUrl;
+      if (displayName != null) {
+        // Backend user model uses snake_case (display_name); keep camelCase
+        // too for compatibility with older endpoints.
+        data['display_name'] = displayName;
+        data['displayName'] = displayName;
+      }
+      if (avatarUrl != null) {
+        data['avatar_url'] = avatarUrl;
+        data['avatarUrl'] = avatarUrl;
+      }
       if (metadata != null) data['metadata'] = metadata;
 
       final response = await client.dio.put(
@@ -135,10 +144,22 @@ class AuthRepository {
         data: data,
       );
 
-      final user = UserModel.fromJson(response.data);
+      // The update succeeded; parse the returned user if possible. Some
+      // backends only reply with {"message": "..."}, so return null then and
+      // let the caller apply the change locally.
+      UserModel? user;
+      try {
+        final body = response.data;
+        final userJson = body is Map && body['user'] is Map
+            ? Map<String, dynamic>.from(body['user'] as Map)
+            : Map<String, dynamic>.from(body as Map);
+        user = UserModel.fromJson(userJson);
+      } catch (_) {
+        user = null;
+      }
       return ApiResult.success(user);
     } on DioException catch (e) {
-      return ApiResult.failure(_handleDioError(e));
+      return ApiResult.failure(friendlyErrorMessage(e));
     } catch (e) {
       return ApiResult.failure('An unexpected error occurred');
     }

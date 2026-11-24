@@ -176,6 +176,11 @@ class _SurveyScreenState extends State<SurveyScreen>
       ),
       // NOTE: FAB removed - survey creation is now admin-only via admin panel
       body: BlocBuilder<SurveyBloc, SurveyState>(
+        // Submission states belong to the form screen; keep showing the list.
+        buildWhen: (_, current) =>
+            current is! SurveySubmitting &&
+            current is! SurveySubmitSuccess &&
+            current is! SurveySubmitFailure,
         builder: (context, state) {
           if (state is SurveyLoading) {
             return const Center(child: CircularProgressIndicator());
@@ -192,14 +197,13 @@ class _SurveyScreenState extends State<SurveyScreen>
                     color: AppColors.error,
                   ),
                   const SizedBox(height: 16),
-                  Text(state.message),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Text(state.message, textAlign: TextAlign.center),
+                  ),
                   const SizedBox(height: 16),
                   ElevatedButton(
-                    onPressed: () {
-                      context.read<SurveyBloc>().add(
-                        SurveyRefresh(isLeader: false, teamId: null),
-                      );
-                    },
+                    onPressed: _loadSurveys,
                     child: const Text('Retry'),
                   ),
                 ],

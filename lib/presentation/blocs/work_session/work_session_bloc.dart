@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/network/api_error.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/storage/local_storage.dart';
 import '../../../services/session_tracking_service.dart';
@@ -165,7 +166,21 @@ class WorkSessionBloc extends Bloc<WorkSessionEvent, WorkSessionState> {
         emit(WorkSessionError(message: 'Failed to check in'));
       }
     } catch (e) {
-      emit(WorkSessionError(message: e.toString()));
+      final message = friendlyErrorMessage(
+        e,
+        fallback: 'Unable to start working in this territory. Please try again.',
+      );
+      debugPrint('[WorkSessionBloc] Check-in failed: $e');
+      emit(WorkSessionError(message: message));
+
+      // If the backend says a session is already running, sync with the
+      // server so the UI reflects the existing active session.
+      final lower = message.toLowerCase();
+      if (lower.contains('active session') ||
+          lower.contains('already checked in') ||
+          lower.contains('already active')) {
+        add(const WorkSessionLoadCurrent());
+      }
     }
   }
 
@@ -231,7 +246,9 @@ class WorkSessionBloc extends Bloc<WorkSessionEvent, WorkSessionState> {
       // If checkout fails, still clear local state
       _currentSession = null;
       await _localStorage?.clearCurrentWorkSession();
-      emit(WorkSessionError(message: e.toString()));
+      emit(WorkSessionError(
+        message: friendlyErrorMessage(e, fallback: 'Failed to check out'),
+      ));
     }
   }
 
@@ -267,7 +284,9 @@ class WorkSessionBloc extends Bloc<WorkSessionEvent, WorkSessionState> {
         emit(const WorkSessionError(message: 'Failed to log visit'));
       }
     } catch (e) {
-      emit(WorkSessionError(message: e.toString()));
+      emit(WorkSessionError(
+        message: friendlyErrorMessage(e, fallback: 'Failed to log visit'),
+      ));
     }
   }
 
